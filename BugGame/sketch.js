@@ -33,7 +33,7 @@ function setup() {
 
 function startGame() {
   bugs = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 8; i++) {
     spawnBug();
   }
   score = 0;
