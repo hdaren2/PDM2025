@@ -5,7 +5,6 @@ let del;
 let polySynth;
 let filterSlider;
 let phaseSlider;
-let delTimeSlider;
 
 let keyNotes = {
   'a': 'C4',
