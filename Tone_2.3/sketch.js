@@ -13,9 +13,9 @@ function setup() {
   createCanvas(700, 400);
 
   startContext = createButton("Start Audio");
-  startContext.position(500, 300);
+  startContext.position(550, 350);
   startContext.mousePressed(startAudioContext);
-  
+
   filt = new Tone.AutoFilter({
     frequency: 5,
     depth: 0.2,
