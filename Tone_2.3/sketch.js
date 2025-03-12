@@ -2,7 +2,6 @@ let noise;
 let noiseEnv;
 let filt;
 let values;
-
 let train1;
 
 function preload() {
