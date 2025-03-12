@@ -12,7 +12,7 @@ function preload() {
 function setup() {
   createCanvas(700, 400);
 
-  startContext = createButton("Start Audio Context");
+  startContext = createButton("Start Audio");
   startContext.position(500, 300);
   startContext.mousePressed(startAudioContext);
   
@@ -34,9 +34,6 @@ function setup() {
 
 function draw() {
   background(train1);
-  textSize(18);
-  
-  text("Start Audio Context then click the train to hear it", 20, 20);
 }
 
 function mouseClicked() {
