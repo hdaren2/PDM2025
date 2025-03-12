@@ -13,7 +13,7 @@ function setup() {
   createCanvas(700, 400);
 
   startContext = createButton("Start Audio Context");
-  startContext.position(20, 20);
+  startContext.position(600, 350);
   startContext.mousePressed(startAudioContext);
   
   filt = new Tone.AutoFilter({
@@ -35,7 +35,8 @@ function setup() {
 function draw() {
   background(train1);
   textSize(24);
-  text("Start Audio Context then click the train to hear it", 400, 350);
+  
+  text("Start Audio Context then click the train to hear it", 10, 10);
 }
 
 function mouseClicked() {
@@ -44,10 +45,9 @@ function mouseClicked() {
 }
 
 function startAudioContext() {
-  if (Tone.context.state != 'running') {
-    Tone.start();
+  Tone.start().then(() => {
     console.log("Audio context started");
-  } else {
-    console.log("Audio context is already running");
-  }
+  }).catch((e) => {
+    console.error("Error starting audio context", e);
+  });
 }
