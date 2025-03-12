@@ -35,5 +35,5 @@ function draw() {
 
 function mouseClicked() {
   noiseEnv.triggerAttackRelease(30);
-  noise1.volume.setValueCurveAtTime(values, Tone.now(), 30);
+  noise.volume.setValueCurveAtTime(values, Tone.now(), 30);
 }
