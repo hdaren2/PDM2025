@@ -24,7 +24,7 @@ function setup() {
     release: 1
   }).connect(filt);
   noise = new Tone.Noise("white").connect(noiseEnv).start();
-  values = new Float32Array([-48, -30, -18, -6, 0, -6, -18, -30, -48, -96]);
+  values = new Float32Array([-48, -42, -36, -30, -24, -18, -12, -6, 0, -6, -12, -18, -24, -30, -36, -48, -96]);
 }
 
 function draw() {
