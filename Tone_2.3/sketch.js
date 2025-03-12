@@ -1,3 +1,4 @@
+let startContext;
 let noise;
 let noiseEnv;
 let filt;
@@ -11,6 +12,10 @@ function preload() {
 function setup() {
   createCanvas(700, 400);
 
+  startContext = createButton("Start Audio Context");
+  startContext.position(20, 20);
+  startContext.mousePressed(startAudioContext);
+  
   filt = new Tone.AutoFilter({
     frequency: 5,
     depth: 0.2,
@@ -30,11 +35,20 @@ function setup() {
 function draw() {
   background(train1);
   textSize(24);
-  text("Click to hear the train", 400, 350);
+  text("Start Audio Context then click the train to hear it", 400, 350);
 }
 
 function mouseClicked() {
   Tone.start();
   noiseEnv.triggerAttackRelease(30);
   noise.volume.setValueCurveAtTime(values, Tone.now(), 30);
+}
+
+function startAudioContext() {
+  if (Tone.context.state != 'running') {
+    Tone.start();
+    console.log("Audio context started");
+  } else {
+    console.log("Audio context is already running");
+  }
 }
