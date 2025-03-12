@@ -36,7 +36,7 @@ function draw() {
   background(train1);
   textSize(18);
   
-  text("Start Audio Context then click the train to hear it", 10, 10);
+  text("Start Audio Context then click the train to hear it", 20, 20);
 }
 
 function mouseClicked() {
