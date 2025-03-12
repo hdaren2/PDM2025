@@ -13,7 +13,7 @@ function setup() {
   createCanvas(700, 400);
 
   startContext = createButton("Start Audio Context");
-  startContext.position(600, 350);
+  startContext.position(500, 300);
   startContext.mousePressed(startAudioContext);
   
   filt = new Tone.AutoFilter({
@@ -34,7 +34,7 @@ function setup() {
 
 function draw() {
   background(train1);
-  textSize(24);
+  textSize(18);
   
   text("Start Audio Context then click the train to hear it", 10, 10);
 }
