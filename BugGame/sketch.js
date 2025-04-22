@@ -20,12 +20,13 @@ let bugScale = 0.3;
 let uiHeight = 50;
 let baseSpeed = 2;
 let audioInitialized = false;
-let samples;
+let samples = {};
 let audioContext;
+let backgroundMusic;
+let isMusicPlaying = false;
 let scuttlePlaying = false;
 let melodySynth;
-let melodySequence;
-let musicPlayer;
+let melodyGain;
 let lastNoteTime = 0;
 let noteIndex = 0;
 let notes = ["A4", "C5", "D5", "E5", "D5", "C5", "A4", "E4"];
@@ -35,6 +36,19 @@ let scuttlePlayer;
 let startBackground;
 let playBackground;
 let endBackground;
+let serial;
+let connectButton;
+let isConnected = false;
+let port;
+let reader;
+let writer;
+let gainNode;
+let serialBuffer = ''; // Add buffer for incoming serial data
+let arduinoX = 400;  // Center X position
+let arduinoY = 300;  // Center Y position
+const JOYSTICK_CENTER = 512;  // Center value of joystick
+const MOVEMENT_THRESHOLD = 20;  // Minimum change to register movement
+let arduinoButtonPressed = false;
 
 function preload() {
   gameFont = loadFont("media/PressStart2P-Regular.ttf");
@@ -43,40 +57,321 @@ function preload() {
   startBackground = loadImage("media/background1.png");
   playBackground = loadImage("media/background2.png");
   endBackground = loadImage("media/background3.png");
-
-  samples = new Tone.Players({
-    squish: "media/squish.mp3",
-    miss: "media/miss.mp3"
-  }, {
-    onload: function () {
-      console.log("All audio files loaded");
-      samples.volume.value = 0;
-    }
-  }).toDestination();
-
-  melodySynth = new Tone.Synth({
-    oscillator: {
-      type: "triangle"
-    },
-    envelope: {
-      attack: 0.02,
-      decay: 0.1,
-      sustain: 0.3,
-      release: 0.8
-    }
-  }).toDestination();
-
-  melodySynth.volume.value = -18;
 }
 
 function setup() {
   createCanvas(800, 600);
   textFont(gameFont);
 
+  // Initialize game state
+  gameState = GameStates.START;
+  bugs = [];
+  score = 0;
+  time = 30;
+
+  // Create serial connection button
+  connectButton = createButton("Connect to Arduino");
+  connectButton.position(0, 600);
+  connectButton.mousePressed(connectToSerial);
+
+  // Initialize audio
+  initAudio();
+
+  console.log("Game initialized in START state");
+}
+
+async function connectToSerial() {
+  if (!isConnected) {
+    try {
+      // Initialize audio if not already initialized
+      if (!audioInitialized) {
+        console.log("Initializing audio...");
+
+        // Initialize audio context
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        console.log("AudioContext created");
+
+        // Create gain node for volume control
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = 0.5; // Set volume to 50%
+        gainNode.connect(audioContext.destination);
+        console.log("Gain node created and connected");
+
+        // Initialize Tone.js
+        console.log("Starting Tone.js...");
+
+        // Wait for Tone.js to be fully loaded
+        if (typeof Tone === 'undefined') {
+          throw new Error("Tone.js not loaded");
+        }
+
+        // Initialize Tone.js with our audio context
+        Tone.setContext(audioContext);
+        console.log("Tone.js context set");
+
+        // Create melody synth
+        melodySynth = new Tone.Synth({
+          oscillator: {
+            type: "sine"
+          },
+          envelope: {
+            attack: 0.005,
+            decay: 0.1,
+            sustain: 0.3,
+            release: 0.1
+          }
+        });
+
+        // Connect the synth to the audio context
+        melodySynth.connect(audioContext.destination);
+        melodySynth.volume.value = -12; // Reduce volume
+        console.log("Melody synth created and connected");
+
+        // Initialize samples using Web Audio API
+        loadAudioFiles();
+
+        audioInitialized = true;
+        console.log("Audio initialized successfully");
+      }
+
+      // Request the port
+      port = await navigator.serial.requestPort();
+
+      // Open the port
+      await port.open({ baudRate: 9600 });
+
+      // Set up the reader
+      reader = port.readable.getReader();
+      readLoop();
+
+      // Set up the writer
+      writer = port.writable.getWriter();
+
+      isConnected = true;
+      connectButton.html("Disconnect Arduino");
+      console.log("Successfully connected to Arduino and initialized audio");
+    } catch (error) {
+      console.error("Failed to connect to Arduino or initialize audio:", error);
+      alert("Failed to connect to Arduino or initialize audio. Please make sure:\n1. Arduino is connected\n2. You selected the correct port\n3. Your browser supports Web Audio API");
+    }
+  } else {
+    try {
+      // Close the reader and writer
+      if (reader) {
+        reader.releaseLock();
+      }
+      if (writer) {
+        writer.releaseLock();
+      }
+      if (port) {
+        await port.close();
+      }
+
+      isConnected = false;
+      connectButton.html("Connect to Arduino");
+      console.log("Disconnected from Arduino");
+    } catch (error) {
+      console.error("Error disconnecting from Arduino:", error);
+    }
+  }
+}
+
+async function readLoop() {
+  try {
+    console.log("Starting read loop...");
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        console.log("Reader done, releasing lock");
+        reader.releaseLock();
+        break;
+      }
+
+      // Convert the received data to a string
+      const str = new TextDecoder().decode(value);
+      serialBuffer += str;
+
+      // Process complete lines
+      const lines = serialBuffer.split('\n');
+      serialBuffer = lines.pop() || ''; 
+
+      for (let line of lines) {
+        line = line.trim();
+        if (line.startsWith('X:') && line.includes(',Y:')) {
+          // Parse raw joystick values
+          const parts = line.split(',');
+          const xPart = parts[0].split(':')[1];
+          const yPart = parts[1].split(':')[1];
+          const rawX = parseInt(xPart);
+          const rawY = parseInt(yPart);
+
+          // Only update if we have valid values
+          if (!isNaN(rawX) && !isNaN(rawY)) {
+            // Map joystick values to screen coordinates
+            arduinoX = map(rawX, 0, 1023, 0, 800);
+            arduinoY = map(rawY, 0, 1023, 0, 600);
+
+            // Constrain to screen bounds
+            arduinoX = constrain(arduinoX, 0, 800);
+            arduinoY = constrain(arduinoY, 0, 600);
+          }
+        } else if (line === 'BUTTON_PRESSED') {
+          handleButtonPress();
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error in readLoop:", error);
+  }
+}
+
+async function sendToArduino(message) {
+  console.log("Attempting to send to Arduino:", message);
+  if (isConnected && writer) {
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(message + '\n');
+      console.log("Encoded message:", data);
+      await writer.write(data);
+      console.log("Message sent successfully");
+    } catch (error) {
+      console.error("Error sending to Arduino:", error);
+    }
+  } else {
+    console.log("Cannot send to Arduino - Connection status:", {
+      isConnected: isConnected,
+      writerExists: !!writer
+    });
+  }
+}
+
+function initAudio() {
+  if (!audioInitialized) {
+    // Create a user interaction event to start audio
+    const startAudio = () => {
+      // Remove the event listener after first interaction
+      document.removeEventListener('click', startAudio);
+      document.removeEventListener('keydown', startAudio);
+
+      try {
+        console.log("Initializing audio...");
+
+        // Initialize audio context
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        console.log("AudioContext created");
+
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = 0.5; // Set volume to 50%
+        gainNode.connect(audioContext.destination);
+        console.log("Gain node created and connected");
+
+        console.log("Starting Tone.js...");
+
+        // Wait for Tone.js to be fully loaded
+        if (typeof Tone === 'undefined') {
+          throw new Error("Tone.js not loaded");
+        }
+
+        // Initialize Tone.js with our audio context
+        Tone.setContext(audioContext);
+        console.log("Tone.js context set");
+
+        // Create melody synth
+        melodySynth = new Tone.Synth({
+          oscillator: {
+            type: "sine"
+          },
+          envelope: {
+            attack: 0.005,
+            decay: 0.1,
+            sustain: 0.3,
+            release: 0.1
+          }
+        });
+
+        // Connect the synth to the audio context
+        melodySynth.connect(audioContext.destination);
+        melodySynth.volume.value = -12; // Reduce volume
+        console.log("Melody synth created and connected");
+
+        // Initialize samples using Web Audio API
+        loadAudioFiles();
+
+        audioInitialized = true;
+        console.log("Audio initialized successfully");
+      } catch (e) {
+        console.error("Error in audio initialization:", e);
+      }
+    };
+
+    // Add event listeners for user interaction
+    document.addEventListener('click', startAudio);
+    document.addEventListener('keydown', startAudio);
+  }
+}
+
+function loadAudioFiles() {
+  // Load all audio files
+  const audioFiles = {
+    squish: 'media/squish.mp3',
+    miss: 'media/miss.mp3',
+    background: 'media/scuttle.mp3'
+  };
+
+  Object.entries(audioFiles).forEach(([name, url]) => {
+    fetch(url)
+      .then(response => response.arrayBuffer())
+      .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+      .then(audioBuffer => {
+        samples[name] = audioBuffer;
+        console.log(`Loaded ${name} audio`);
+
+        // Start background music when it's loaded
+        if (name === 'background' && !isMusicPlaying) {
+          playBackgroundMusic();
+        }
+      })
+      .catch(e => console.error(`Error loading ${name} audio:`, e));
+  });
+}
+
+function playBackgroundMusic() {
+  if (audioInitialized && samples.background) {
+    // Stop any existing background music
+    if (backgroundMusic) {
+      backgroundMusic.stop();
+    }
+
+    // Only play if in PLAY state
+    if (gameState === GameStates.PLAY) {
+      const source = audioContext.createBufferSource();
+      source.buffer = samples.background;
+      source.loop = true;
+      source.connect(gainNode);
+      source.start(0);
+      backgroundMusic = source;
+      isMusicPlaying = true;
+      console.log("Background music started");
+    } else {
+      isMusicPlaying = false;
+      console.log("Background music stopped");
+    }
+  }
+}
+
+function playSound(soundName) {
+  if (audioInitialized && samples[soundName]) {
+    const source = audioContext.createBufferSource();
+    source.buffer = samples[soundName];
+    source.connect(audioContext.destination);
+    source.start(0);
+    console.log(`Playing ${soundName} sound`);
+  }
 }
 
 function startGame() {
-  bugs = [];
+  console.log("Starting new game");
+  bugs = [];  // Clear any existing bugs
   for (let i = 0; i < 8; i++) {
     spawnBug();
   }
@@ -88,28 +383,10 @@ function startGame() {
   lastNoteTime = 0;
   noteIndex = 0;
 
-  if (audioInitialized) {
-    try {
-      if (scuttlePlayer) {
-        scuttlePlayer.stop();
-        scuttlePlayer.dispose();
-      }
+  // Start background music
+  playBackgroundMusic();
 
-      scuttlePlayer = new Tone.Player({
-        url: "media/scuttle.mp3",
-        loop: true,
-        autostart: true,
-        onload: () => {
-          console.log("Scuttle sound loaded");
-          scuttlePlayer.volume.value = 0;
-          scuttlePlaying = true;
-          console.log("Scuttle sound started");
-        }
-      }).toDestination();
-    } catch (e) {
-      console.error("Error playing scuttle sound:", e);
-    }
-  }
+  console.log("Game started with", bugs.length, "bugs");
 }
 
 function spawnBug() {
@@ -118,7 +395,10 @@ function spawnBug() {
     x = random(50, width - 100);
     y = random(uiHeight + 50, height - 100);
   } while (y < uiHeight + 20);
-  bugs.push(new Bug(x, y));
+
+  let newBug = new Bug(x, y);
+  bugs.push(newBug);
+  console.log("Bug spawned at:", x, y);
 }
 
 function draw() {
@@ -130,41 +410,46 @@ function draw() {
       textSize(42);
       text("SPLAT!", width / 2, height / 2);
       textSize(18);
-      text("Press ENTER to Start", width / 2, height * 3 / 4);
+      text("Press JOYSTICK BUTTON to Start", width / 2, height * 3 / 4);
       break;
     case GameStates.PLAY:
       image(playBackground, 0, 0, width, height);
       drawUI();
-      textAlign(LEFT, TOP);
-      text(`Score: ${score}`, textPadding, textPadding);
-      textAlign(RIGHT, TOP);
-      text(`Time: ${ceil(time)}`, width - textPadding, textPadding);
 
-      let elapsed = (millis() - startTime) / 1000;
-      time = max(30 - elapsed, 0);
-      if (time <= 0) {
-        gameState = GameStates.END;
-        if (scuttlePlaying && scuttlePlayer) {
-          scuttlePlayer.stop();
-          scuttlePlayer.dispose();
-          scuttlePlaying = false;
-          console.log("Sounds stopped");
+      // Update time
+      if (startTime) {
+        time = 30 - (millis() - startTime) / 1000;
+        if (time <= 0) {
+          time = 0;
+          gameState = GameStates.END;
+          if (melodySynth) {
+            melodySynth.triggerRelease();
+          }
+          playBackgroundMusic(); // Stop background music
         }
       }
-      if (audioInitialized) {
-        noteInterval = baseNoteInterval / (1 + score * 0.2);
 
-        let currentTime = millis();
-        if (currentTime - lastNoteTime > noteInterval) {
-          melodySynth.triggerAttackRelease(notes[noteIndex], "8n");
-          noteIndex = (noteIndex + 1) % notes.length;
-          lastNoteTime = currentTime;
-        }
+      // Draw Arduino cursor with crosshair
+      push();
+      noFill();
+      stroke(255, 0, 0);
+      strokeWeight(3);
+      ellipse(arduinoX, arduinoY, 50, 50);
+      line(arduinoX - 30, arduinoY, arduinoX + 30, arduinoY);
+      line(arduinoX, arduinoY - 30, arduinoX, arduinoY + 30);
+      fill(255, 0, 0);
+      noStroke();
+      ellipse(arduinoX, arduinoY, 15, 15);
+      pop();
+
+      // Update and display bugs
+      for (let i = bugs.length - 1; i >= 0; i--) {
+        bugs[i].update();
+        bugs[i].display();
       }
-      for (let bug of bugs) {
-        bug.update();
-        bug.display();
-      }
+
+      // Update melody
+      updateMelody();
       break;
     case GameStates.END:
       image(endBackground, 0, 0, width, height);
@@ -176,7 +461,7 @@ function draw() {
         highScore = score;
       }
       text(`High Score: ${highScore}`, width / 2, height / 2 + 20);
-      text("Press ENTER to Restart", width / 2, height * 3 / 4);
+      text("Press JOYSTICK BUTTON to Restart", width / 2, height * 3 / 4);
       break;
   }
 }
@@ -192,20 +477,6 @@ function drawUI() {
   text(`Time: ${ceil(time)}`, width - textPadding, textPadding);
 }
 
-function initAudio() {
-  if (!audioInitialized) {
-    Tone.start().then(() => {
-      console.log("Audio context started");
-      Tone.context.resume();
-      Tone.Transport.start();
-      audioInitialized = true;
-      console.log("Audio initialized successfully");
-    }).catch((e) => {
-      console.error("Error starting audio context", e);
-    });
-  }
-}
-
 function keyPressed() {
   if (keyCode === ENTER && gameState !== GameStates.PLAY) {
     startGame();
@@ -213,41 +484,62 @@ function keyPressed() {
   }
 }
 
-function mousePressed() {
-  initAudio();
-  let hitBug = false;
+function handleButtonPress() {
+  switch (gameState) {
+    case GameStates.START:
+      // Start the game
+      startGame();
+      break;
+    case GameStates.PLAY:
+      // Try to squish a bug
+      let hitBug = false;
+      for (let bug of bugs) {
+        if (!bug.isSquished && bug.isClicked(arduinoX, arduinoY)) {
+          hitBug = true;
+          bug.squish();
+          playSound('squish');
 
-  for (let bug of bugs) {
-    if (!bug.isSquished && bug.isClicked(mouseX, mouseY)) {
-      hitBug = true;
-      bug.squish();
-      if (audioInitialized) {
-        console.log("Attempting to play squish sound");
-        try {
-          const player = new Tone.Player({
-            url: "media/squish.mp3",
-            onload: function () {
-              player.volume.value = 0;
-              player.start();
-              console.log("Squish sound played successfully");
-            }
-          }).toDestination();
-        } catch (e) {
-          console.error("Error playing squish sound:", e);
+          // Send command to Arduino to trigger feedback
+          if (isConnected) {
+            sendToArduino("BUG_SQUISHED");
+          }
+
+          score++;
+          spawnBug();
+          break;
         }
       }
-      score++;
-      spawnBug();
-    }
+
+      if (!hitBug && arduinoY > uiHeight) {
+        playSound('miss');
+      }
+      break;
+    case GameStates.END:
+      // Restart the game
+      startGame();
+      break;
+  }
+}
+
+function updateMelody() {
+  // Only play sounds when the game is in PLAY state
+  if (gameState !== GameStates.PLAY) {
+    return;
   }
 
-  if (!hitBug && gameState === GameStates.PLAY && mouseY > uiHeight) {
-    if (audioInitialized) {
-      console.log("Playing miss sound");
+  if (audioInitialized && melodySynth) {
+    const currentTime = millis();
+    noteInterval = baseNoteInterval / (1 + score * 0.2);
+
+    if (currentTime - lastNoteTime > noteInterval) {
       try {
-        samples.player("miss").start();
+        const note = notes[noteIndex];
+        console.log("Playing note:", note, "at interval:", noteInterval);
+        melodySynth.triggerAttackRelease(note, "8n");
+        noteIndex = (noteIndex + 1) % notes.length;
+        lastNoteTime = currentTime;
       } catch (e) {
-        console.error("Error playing miss sound:", e);
+        console.error("Error playing note:", e);
       }
     }
   }
@@ -286,8 +578,14 @@ class Bug {
   }
 
   keepInBounds() {
-    if (this.x < 50 || this.x > width - 50) this.direction.x *= -1;
-    if (this.y < uiHeight + 50 || this.y > height - 50) this.direction.y *= -1;
+    if (this.x < 50 || this.x > width - 50) {
+      this.direction.x *= -1;
+      this.x = constrain(this.x, 50, width - 50);
+    }
+    if (this.y < uiHeight + 50 || this.y > height - 50) {
+      this.direction.y *= -1;
+      this.y = constrain(this.y, uiHeight + 50, height - 50);
+    }
   }
 
   display() {
@@ -314,3 +612,4 @@ class Bug {
     this.squishTime = millis();
   }
 }
+
