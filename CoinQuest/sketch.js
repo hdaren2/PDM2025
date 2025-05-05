@@ -8,6 +8,7 @@ let audioInitialized = false;
 let missSampler;
 let jumpSynth;
 let highScore = 0;
+let port; // Serial port for Arduino communication
 
 // Game state
 let gameState = {
@@ -404,6 +405,14 @@ function setup() {
     // Create canvas
     let canvas = createCanvas(800, 600);
 
+    // Initialize serial communication
+    port = createSerial();
+
+    // Add connect button
+    let connectButton = createButton('Connect to Arduino');
+    connectButton.position(10, 10);
+    connectButton.mousePressed(connect);
+
     // Initialize miss sound sampler
     missSampler = new Tone.Sampler({
       urls: {
@@ -663,6 +672,9 @@ function drawWelcomeScene() {
 
     // Reset player
     player = new Player();
+
+    // Reset LEDs to show all 3 lives
+    updateLivesLEDs();
   }
 }
 
@@ -911,6 +923,7 @@ function drawGameplayScene() {
       player.invincibleTimer = 60;
       // Play miss sound when hit
       missSampler.triggerAttack("C4");
+      updateLivesLEDs(); // Update LEDs when lives change due to enemy hit
       if (gameState.lives <= 0) {
         gameState.currentScene = 'gameover';
         break;
@@ -974,5 +987,22 @@ function initAudio() {
     }).catch((e) => {
       console.error("Error starting audio context", e);
     });
+  }
+}
+
+function connect() {
+  port.open('Arduino', 9600);
+}
+
+// Function to update LED lights based on lives
+function updateLivesLEDs() {
+  if (port.opened()) {
+    // Send a byte where each bit represents an LED (1 = on, 0 = off)
+    // We'll use the first 3 bits for the 3 lives
+    let ledState = 0;
+    for (let i = 0; i < gameState.lives; i++) {
+      ledState |= (1 << i);
+    }
+    port.write(ledState);
   }
 }
