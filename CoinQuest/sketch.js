@@ -440,7 +440,7 @@ function setup() {
       }
     });
 
-    // Create effects chain
+    // Create effects
     const reverb = new Tone.Reverb({
       decay: 2.5,
       wet: 0.3
