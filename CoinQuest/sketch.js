@@ -923,7 +923,7 @@ function drawGameplayScene() {
       player.invincibleTimer = 60;
       // Play miss sound when hit
       missSampler.triggerAttack("C4");
-      updateLivesLEDs(); // Update LEDs when lives change due to enemy hit
+      updateLivesLEDs(true); // Pass true to indicate this is a hit
       if (gameState.lives <= 0) {
         gameState.currentScene = 'gameover';
         break;
@@ -995,14 +995,21 @@ function connect() {
 }
 
 // Function to update LED lights based on lives
-function updateLivesLEDs() {
+function updateLivesLEDs(isHit = false) {
   if (port.opened()) {
-    // Send a byte where each bit represents an LED (1 = on, 0 = off)
-    // We'll use the first 3 bits for the 3 lives
+    // Send a byte where:
+    // - bits 0-2 represent LED states (1 = on, 0 = off)
+    // - bit 7 represents hit status (1 = hit, 0 = no hit)
     let ledState = 0;
     for (let i = 0; i < gameState.lives; i++) {
       ledState |= (1 << i);
     }
+
+    // If this is a hit, set the hit bit
+    if (isHit) {
+      ledState |= 0x80;
+    }
+
     port.write(ledState);
   }
 }
