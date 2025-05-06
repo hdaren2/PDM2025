@@ -44,6 +44,8 @@ let coins = [];
 let enemies = [];
 let maxCoins = 5;
 let maxEnemies = 3;
+let baseEnemies = 3;  // Base number of enemies
+let maxHardEnemies = 10;  // Maximum number of enemies at highest difficulty
 
 // Platform settings
 let platforms = [];
@@ -762,7 +764,7 @@ function drawGameplayScene() {
   // Update timer and difficulty
   let currentTime = millis();
   if (currentTime - gameState.lastTime >= 1000) {
-    gameState.timeElapsed++;  // Increment time instead of decrementing
+    gameState.timeElapsed++;
     gameState.lastTime = currentTime;
 
     // Add points every 10 seconds
@@ -771,15 +773,11 @@ function drawGameplayScene() {
     }
 
     // Increase difficulty every 8 seconds
-    if (gameState.timeLeft % 8 === 0) {
-      gameState.difficulty += 0.2;  // Increased from 0.1 to 0.2
-      gameState.gameSpeed = 1 + (gameState.difficulty * 0.3);  // Increased multiplier from 0.2 to 0.3
-      maxEnemies = min(3 + floor(gameState.difficulty), 8);
-
-      // Update music tempo based on game speed
-      if (isMusicInitialized) {
-        Tone.Transport.bpm.value = min(100 * gameState.gameSpeed, 400);
-      }
+    if (gameState.timeElapsed % 10 === 0) {
+      gameState.difficulty += 0.2;
+      gameState.gameSpeed = 1 + (gameState.difficulty * 0.3);
+      // Scale max enemies with difficulty
+      maxEnemies = min(baseEnemies + floor(gameState.difficulty * 2), maxHardEnemies);
     }
   }
 
