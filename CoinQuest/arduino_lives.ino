@@ -64,7 +64,7 @@ void loop()
     int swValue = digitalRead(SW_PIN); // Read SW button state
 
     // Convert to -1 to 1 range
-    float xNormalized = map(xValue, 0, 1023, -1, 1);
+    float xNormalized = map(xValue, -512, 1023, -1, 1);
     float yNormalized = map(yValue, 0, 1023, -1, 1);
 
     // Send data in format "X,Y,SW\n"
@@ -74,5 +74,5 @@ void loop()
     Serial.print(",");
     Serial.println(swValue);
 
-    delay(10); // Small delay to prevent overwhelming the serial port
+    delay(20); // Small delay to prevent overwhelming the serial port
 }

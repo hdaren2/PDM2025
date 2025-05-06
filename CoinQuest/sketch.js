@@ -479,14 +479,14 @@ function setup() {
     backgroundMusic = new Tone.Part((time, note) => {
       synth.triggerAttackRelease(note, "8n", time);
     }, [
-      ["0:0", "C3"],
-      ["0:1", "E3"],
-      ["0:2", "G3"],
-      ["0:3", "A3"],
-      ["1:0", "F3"],
-      ["1:1", "D3"],
-      ["1:2", "B2"],
-      ["1:3", "G2"]
+      ["0:0", "C4"],
+      ["0:1", "E4"],
+      ["0:2", "G4"],
+      ["0:3", "A4"],
+      ["1:0", "F4"],
+      ["1:1", "D4"],
+      ["1:2", "B3"],
+      ["1:3", "G3"]
     ]).start(0);
 
     // Set the loop points and enable looping
@@ -654,7 +654,7 @@ function drawWelcomeScene() {
   fill(255);
   text('Controls:', width / 2, height / 2);
   text('Joystick: Move', width / 2, height / 2 + 40);
-  text('Button: Jump', width / 2, height / 2 + 80);
+  text('Joystick Button: Jump', width / 2, height / 2 + 80);
 
   // Add blinking effect to "Press ENTER to Start"
   let blink = sin(frameCount * 0.05) > 0;
@@ -714,16 +714,16 @@ function drawGameplayScene() {
     gameState.timeLeft--;
     gameState.lastTime = currentTime;
 
-    // Increase difficulty every 10 seconds
+    // Increase difficulty every 8 seconds
     if (gameState.timeLeft % 8 === 0) {
-      gameState.difficulty += 0.1;
-      gameState.gameSpeed = 1 + (gameState.difficulty * 0.2);
+      gameState.difficulty += 0.2;  // Increased from 0.1 to 0.2
+      gameState.gameSpeed = 1 + (gameState.difficulty * 0.3);  // Increased multiplier from 0.2 to 0.3
       maxEnemies = min(3 + floor(gameState.difficulty), 8);
 
       // Update music tempo based on game speed
       if (isMusicInitialized) {
-        // Base tempo is 100 BPM, scale up to 300 BPM max
-        Tone.Transport.bpm.value = min(100 * gameState.gameSpeed, 300);
+        // Base tempo is 100 BPM, scale up to 400 BPM max (increased from 300)
+        Tone.Transport.bpm.value = min(100 * gameState.gameSpeed, 400);
       }
     }
   }
@@ -995,7 +995,8 @@ function keyPressed() {
 }
 
 function getPlatformSpeed() {
-  const speedMultiplier = min(1 + (gameState.score / 125), 6);
+  // More aggressive speed scaling with score
+  const speedMultiplier = min(1 + (gameState.score / 75), 8);  // Changed from 125 to 75 and max from 6 to 8
   return basePlatformSpeed * speedMultiplier;
 }
 
