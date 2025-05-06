@@ -146,16 +146,38 @@ class Player extends Character {
     // Reset movement state
     this.isMoving = false;
 
-    // Handle horizontal movement with joystick
-    if (abs(joystickX) > joystickThreshold) {
-      if (joystickX < -joystickThreshold && this.x - this.speed > this.size / 2) {
+    // Check if Arduino is connected
+    const isArduinoConnected = port && port.opened();
+
+    // Handle horizontal movement
+    if (isArduinoConnected) {
+      // Use joystick controls if Arduino is connected
+      if (abs(joystickX) > joystickThreshold) {
+        if (joystickX < -joystickThreshold && this.x - this.speed > this.size / 2) {
+          this.x -= this.speed;
+          this.facingRight = false;
+          this.isMoving = true;
+          this.currentAnimation = "left";
+          this.animations[this.currentAnimation].flipped = true;
+        }
+        if (joystickX > joystickThreshold && this.x + this.speed < width - this.size / 2) {
+          this.x += this.speed;
+          this.facingRight = true;
+          this.isMoving = true;
+          this.currentAnimation = "right";
+          this.animations[this.currentAnimation].flipped = false;
+        }
+      }
+    } else {
+      // Use keyboard controls if Arduino is not connected
+      if (keyIsDown(LEFT_ARROW) && this.x - this.speed > this.size / 2) {
         this.x -= this.speed;
         this.facingRight = false;
         this.isMoving = true;
         this.currentAnimation = "left";
         this.animations[this.currentAnimation].flipped = true;
       }
-      if (joystickX > joystickThreshold && this.x + this.speed < width - this.size / 2) {
+      if (keyIsDown(RIGHT_ARROW) && this.x + this.speed < width - this.size / 2) {
         this.x += this.speed;
         this.facingRight = true;
         this.isMoving = true;
@@ -170,24 +192,48 @@ class Player extends Character {
       this.animations[this.currentAnimation].flipped = !this.facingRight;
     }
 
-    // Handle jumping with SW button
-    if (joystickSW === 0 && !this.isJumping && this.onPlatform) { // SW button is active low
-      this.jumpStartTime = millis();
-      this.isJumping = true;
-      this.onPlatform = false;
-      this.initialJumpVelocity = this.jumpForce * this.minJumpMultiplier;
-      this.velocity = this.initialJumpVelocity;
+    // Handle jumping
+    if (isArduinoConnected) {
+      // Use joystick button for jumping if Arduino is connected
+      if (joystickSW === 0 && !this.isJumping && this.onPlatform) {
+        this.jumpStartTime = millis();
+        this.isJumping = true;
+        this.onPlatform = false;
+        this.initialJumpVelocity = this.jumpForce * this.minJumpMultiplier;
+        this.velocity = this.initialJumpVelocity;
 
-      // Play jump sound
-      jumpSynth.triggerAttackRelease("G5", "16n");
-    }
+        // Play jump sound
+        jumpSynth.triggerAttackRelease("G5", "16n");
+      }
 
-    // Apply variable jump height while SW button is held
-    if (this.isJumping && joystickSW === 0) {
-      let holdDuration = millis() - this.jumpStartTime;
-      if (holdDuration < this.maxJumpDuration) {
-        let jumpMultiplier = this.minJumpMultiplier + ((1 - this.minJumpMultiplier) * (holdDuration / this.maxJumpDuration));
-        this.velocity = this.jumpForce * jumpMultiplier;
+      // Apply variable jump height while SW button is held
+      if (this.isJumping && joystickSW === 0) {
+        let holdDuration = millis() - this.jumpStartTime;
+        if (holdDuration < this.maxJumpDuration) {
+          let jumpMultiplier = this.minJumpMultiplier + ((1 - this.minJumpMultiplier) * (holdDuration / this.maxJumpDuration));
+          this.velocity = this.jumpForce * jumpMultiplier;
+        }
+      }
+    } else {
+      // Use spacebar for jumping if Arduino is not connected
+      if (keyIsDown(32) && !this.isJumping && this.onPlatform) { // 32 is spacebar
+        this.jumpStartTime = millis();
+        this.isJumping = true;
+        this.onPlatform = false;
+        this.initialJumpVelocity = this.jumpForce * this.minJumpMultiplier;
+        this.velocity = this.initialJumpVelocity;
+
+        // Play jump sound
+        jumpSynth.triggerAttackRelease("G5", "16n");
+      }
+
+      // Apply variable jump height while spacebar is held
+      if (this.isJumping && keyIsDown(32)) {
+        let holdDuration = millis() - this.jumpStartTime;
+        if (holdDuration < this.maxJumpDuration) {
+          let jumpMultiplier = this.minJumpMultiplier + ((1 - this.minJumpMultiplier) * (holdDuration / this.maxJumpDuration));
+          this.velocity = this.jumpForce * jumpMultiplier;
+        }
       }
     }
 
@@ -653,8 +699,13 @@ function drawWelcomeScene() {
   textSize(24);
   fill(255);
   text('Controls:', width / 2, height / 2);
-  text('Joystick: Move', width / 2, height / 2 + 40);
-  text('Joystick Button: Jump', width / 2, height / 2 + 80);
+  if (port && port.opened()) {
+    text('Joystick: Move', width / 2, height / 2 + 40);
+    text('Joystick Button: Jump', width / 2, height / 2 + 80);
+  } else {
+    text('Arrow Keys: Move', width / 2, height / 2 + 40);
+    text('Space: Jump', width / 2, height / 2 + 80);
+  }
 
   // Add blinking effect to "Press ENTER to Start"
   let blink = sin(frameCount * 0.05) > 0;
