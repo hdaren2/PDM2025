@@ -721,9 +721,11 @@ function drawWelcomeScene() {
     // Reset game state
     gameState.score = 0;
     gameState.lives = 3;
-    gameState.timeElapsed = 0;  // Changed from timeLeft to timeElapsed
+    gameState.timeElapsed = 0;
     gameState.gameSpeed = 1;
     gameState.lastTime = millis();
+    gameState.difficulty = 1; 
+
 
     // Reset platforms
     platforms = [];
