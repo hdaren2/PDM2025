@@ -8,17 +8,17 @@ let audioInitialized = false;
 let missSampler;
 let jumpSynth;
 let highScore = 0;
-let port; // Serial port for Arduino communication
+let port; 
 let joystickX = 0;
 let joystickY = 0;
-let joystickSW = 0;  // SW button state
-let joystickThreshold = 0.2; // Threshold to prevent drift
+let joystickSW = 0;  
+let joystickThreshold = 0.2;
 
 // Game state
 let gameState = {
   score: 0,
   lives: 3,
-  timeElapsed: 0,  // Changed from timeLeft to timeElapsed
+  timeElapsed: 0, 
   currentScene: 'welcome',
   lastTime: 0,
   gameSpeed: 1,
@@ -44,7 +44,7 @@ let coins = [];
 let enemies = [];
 let maxCoins = 5;
 let maxEnemies = 3;
-let baseEnemies = 3;  // Base number of enemies
+let baseEnemies = 3;  
 let maxHardEnemies = 10;  // Maximum number of enemies at highest difficulty
 
 // Platform settings
@@ -68,7 +68,7 @@ class Platform {
     this.y = y;
     this.width = width;
     this.height = 20;
-    this.coinsCollected = 0; // Track how many coins have been collected from this platform
+    this.coinsCollected = 0; 
   }
 
   move() {
@@ -76,7 +76,7 @@ class Platform {
   }
 
   display() {
-    fill(139, 69, 19); // Brown color
+    fill(139, 69, 19); 
     noStroke();
     rect(this.x, this.y, this.width, this.height);
   }
@@ -129,7 +129,6 @@ class Player extends Character {
     this.initialJumpVelocity = 0;
     this.minJumpMultiplier = 0.5;
 
-    // Initialize animations
     this.addAnimation("stand", new SpriteAnimation(playerSprite, 0, 0, 1));
     this.addAnimation("right", new SpriteAnimation(playerSprite, 0, 0, 9));
     this.addAnimation("left", new SpriteAnimation(playerSprite, 0, 0, 9));
@@ -137,7 +136,6 @@ class Player extends Character {
   }
 
   move() {
-    // Update invincibility timer
     if (this.isInvincible) {
       this.invincibleTimer--;
       if (this.invincibleTimer <= 0) {
@@ -145,10 +143,8 @@ class Player extends Character {
       }
     }
 
-    // Reset movement state
     this.isMoving = false;
 
-    // Check if Arduino is connected
     const isArduinoConnected = port && port.opened();
 
     // Handle horizontal movement
@@ -218,7 +214,7 @@ class Player extends Character {
       }
     } else {
       // Use spacebar for jumping if Arduino is not connected
-      if (keyIsDown(32) && !this.isJumping && this.onPlatform) { // 32 is spacebar
+      if (keyIsDown(32) && !this.isJumping && this.onPlatform) { 
         this.jumpStartTime = millis();
         this.isJumping = true;
         this.onPlatform = false;
@@ -366,9 +362,8 @@ class Enemy extends Character {
     this.speed = random(2, 4) * gameState.gameSpeed;
     this.pattern = floor(random(3));
     this.isMoving = true;
-    this.collisionSizeMultiplier = 0.7; // Make collision box 70% of visual size
+    this.collisionSizeMultiplier = 0.7; 
 
-    // Initialize animation
     this.addAnimation("move", new SpriteAnimation(enemySprite, 0, 0, 11));
     this.currentAnimation = "move";
   }
@@ -395,7 +390,6 @@ class Enemy extends Character {
         break;
     }
 
-    // Update isMoving based on position
     this.isMoving = this.y < height + this.size &&
       this.x > -this.size &&
       this.x < width + this.size;
@@ -453,143 +447,120 @@ function preload() {
 }
 
 function setup() {
-  try {
-    imageMode(CENTER);
+  imageMode(CENTER);
+  createCanvas(800, 600);
 
-    // Create canvas
-    let canvas = createCanvas(800, 600);
+  port = createSerial();
 
-    // Initialize serial communication
-    port = createSerial();
+  let connectButton = createButton('Connect to Arduino');
+  connectButton.position(10, 10);
+  connectButton.mousePressed(connect);
 
-    // Add connect button
-    let connectButton = createButton('Connect to Arduino');
-    connectButton.position(10, 10);
-    connectButton.mousePressed(connect);
+  missSampler = new Tone.Sampler({
+    urls: {
+      C4: "assets/miss.mp3"
+    },
+  }).toDestination();
 
-    // Initialize miss sound sampler
-    missSampler = new Tone.Sampler({
-      urls: {
-        C4: "assets/miss.mp3"
-      },
-    }).toDestination();
-
-    // Initialize jump sound synth
-    jumpSynth = new Tone.Synth({
-      oscillator: {
-        type: "sine"
-      },
-      envelope: {
-        attack: 0.01,
-        decay: 0.1,
-        sustain: 0.1,
-        release: 0.1
-      }
-    }).toDestination();
-
-    // Initialize background music
-    synth = new Tone.Synth({
-      oscillator: {
-        type: "sine",
-        modulationType: "sawtooth",
-        modulationIndex: 2,
-        harmonicity: 0.5
-      },
-      envelope: {
-        attack: 0.1,
-        decay: 0.2,
-        sustain: 0.3,
-        release: 0.8
-      }
-    });
-
-    // Create effects
-    const reverb = new Tone.Reverb({
-      decay: 2.5,
-      wet: 0.3
-    }).toDestination();
-
-    const delay = new Tone.FeedbackDelay({
-      delayTime: 0.25,
-      feedback: 0.3,
-      wet: 0.2
-    }).connect(reverb);
-
-    const distortion = new Tone.Distortion({
-      distortion: 0.2,
-      wet: 0.1
-    }).connect(delay);
-
-    // Connect synth to effects chain
-    synth.connect(distortion);
-
-    // Create background music pattern
-    backgroundMusic = new Tone.Part((time, note) => {
-      synth.triggerAttackRelease(note, "8n", time);
-    }, [
-      ["0:0", "C4"],
-      ["0:1", "E4"],
-      ["0:2", "G4"],
-      ["0:3", "A4"],
-      ["1:0", "F4"],
-      ["1:1", "D4"],
-      ["1:2", "B3"],
-      ["1:3", "G3"]
-    ]).start(0);
-
-    // Set the loop points and enable looping
-    backgroundMusic.loop = true;
-    backgroundMusic.loopStart = "0:0";
-    backgroundMusic.loopEnd = "2:0";
-
-    // Set initial tempo
-    Tone.Transport.bpm.value = 100;
-
-    // Initialize platform variables
-    lastPlatformX = width;
-
-    // Initialize game state
-    gameState = {
-      score: 0,
-      lives: 3,
-      timeElapsed: 0,  // Changed from timeLeft to timeElapsed
-      currentScene: 'welcome',
-      lastTime: millis(),
-      gameSpeed: 1,
-      difficulty: 1
-    };
-
-    // Create player
-    player = new Player();
-
-    // Create initial platforms
-    platforms = [];
-    for (let i = 0; i < 3; i++) {
-      let platformWidth = random(100, 200);
-      let platformY = random(height * 0.6, height * 0.8);
-      platforms.push(new Platform(width / 2 + i * 300, platformY, platformWidth));
+  jumpSynth = new Tone.Synth({
+    oscillator: {
+      type: "sine"
+    },
+    envelope: {
+      attack: 0.01,
+      decay: 0.1,
+      sustain: 0.1,
+      release: 0.1
     }
+  }).toDestination();
 
-    // Initialize coins and enemies
-    coins = [];
-    enemies = [];
-    for (let i = 0; i < maxCoins; i++) {
-      coins.push(new Coin());
+  synth = new Tone.Synth({
+    oscillator: {
+      type: "sine",
+      modulationType: "sawtooth",
+      modulationIndex: 2,
+      harmonicity: 0.5
+    },
+    envelope: {
+      attack: 0.1,
+      decay: 0.2,
+      sustain: 0.3,
+      release: 0.8
     }
-    for (let i = 0; i < maxEnemies; i++) {
-      enemies.push(new Enemy());
-    }
+  });
 
-    // Create background elements
-    createBackground();
-    console.log("Setup complete");
-  } catch (error) {
-    console.error("Error in setup:", error);
+  const reverb = new Tone.Reverb({
+    decay: 2.5,
+    wet: 0.3
+  }).toDestination();
+
+  const delay = new Tone.FeedbackDelay({
+    delayTime: 0.25,
+    feedback: 0.3,
+    wet: 0.2
+  }).connect(reverb);
+
+  const distortion = new Tone.Distortion({
+    distortion: 0.2,
+    wet: 0.1
+  }).connect(delay);
+
+  synth.connect(distortion);
+
+  backgroundMusic = new Tone.Part((time, note) => {
+    synth.triggerAttackRelease(note, "8n", time);
+  }, [
+    ["0:0", "C4"],
+    ["0:1", "E4"],
+    ["0:2", "G4"],
+    ["0:3", "A4"],
+    ["1:0", "F4"],
+    ["1:1", "D4"],
+    ["1:2", "B3"],
+    ["1:3", "G3"]
+  ]).start(0);
+
+  backgroundMusic.loop = true;
+  backgroundMusic.loopStart = "0:0";
+  backgroundMusic.loopEnd = "2:0";
+
+  Tone.Transport.bpm.value = 100;
+
+  lastPlatformX = width;
+
+  gameState = {
+    score: 0,
+    lives: 3,
+    timeElapsed: 0,  
+    currentScene: 'welcome',
+    lastTime: millis(),
+    gameSpeed: 1,
+    difficulty: 1
+  };
+
+  player = new Player();
+
+  platforms = [];
+  for (let i = 0; i < 3; i++) {
+    let platformWidth = random(100, 200);
+    let platformY = random(height * 0.6, height * 0.8);
+    platforms.push(new Platform(width / 2 + i * 300, platformY, platformWidth));
   }
+
+  coins = [];
+  enemies = [];
+  for (let i = 0; i < maxCoins; i++) {
+    coins.push(new Coin());
+  }
+  for (let i = 0; i < maxEnemies; i++) {
+    enemies.push(new Enemy());
+  }
+
+  createBackground();
+  
 }
 
 function createBackground() {
-  // Create clouds
   for (let i = 0; i < 5; i++) {
     clouds.push({
       x: random(width),
@@ -599,7 +570,6 @@ function createBackground() {
     });
   }
 
-  // Create stars
   for (let i = 0; i < 100; i++) {
     stars.push({
       x: random(width),
@@ -609,7 +579,6 @@ function createBackground() {
     });
   }
 
-  // Create ground tiles
   for (let i = 0; i < width / 50 + 1; i++) {
     groundTiles.push({
       x: i * 50,
@@ -623,34 +592,26 @@ function createBackground() {
 // GAME LOOP AND SCENE MANAGEMENT
 // =============================================
 function draw() {
-  // Read joystick data from Arduino
   if (port.available() > 0) {
     let data = port.readUntil('\n');
     if (data) {
-      try {
         let values = data.split(',');
         if (values.length >= 3) {
           joystickX = parseFloat(values[0]);
           joystickY = parseFloat(values[1]);
           joystickSW = parseInt(values[2]);
         }
-      } catch (e) {
-        console.error("Error parsing joystick data:", e);
-      }
     }
   }
 
-  // Draw background
   background(0, 0, 50);
 
-  // Draw stars
   for (let star of stars) {
     fill(star.brightness);
     noStroke();
     ellipse(star.x, star.y, star.size);
   }
 
-  // Draw clouds
   for (let cloud of clouds) {
     fill(255, 255, 255, 150);
     noStroke();
@@ -658,24 +619,20 @@ function draw() {
     ellipse(cloud.x + cloud.size / 3, cloud.y - cloud.size / 4, cloud.size * 0.8);
     ellipse(cloud.x - cloud.size / 3, cloud.y - cloud.size / 4, cloud.size * 0.8);
 
-    // Move clouds
     cloud.x += cloud.speed * 0.5;
     if (cloud.x > width + cloud.size) {
       cloud.x = -cloud.size;
     }
   }
 
-  // Draw ground
   for (let tile of groundTiles) {
     fill(34, 139, 34);
     noStroke();
     rect(tile.x, tile.y, tile.size, 100);
   }
 
-  // Update frame counter
   frameCount++;
 
-  // Draw current scene
   switch (gameState.currentScene) {
     case 'welcome':
       drawWelcomeScene();
@@ -690,14 +647,12 @@ function draw() {
 }
 
 function drawWelcomeScene() {
-  // Draw game title
   push();
   textSize(64);
   textAlign(CENTER);
   fill(255, 215, 0);
   text('COIN QUEST', width / 2, height / 3);
 
-  // Draw instructions
   textSize(24);
   fill(255);
   text('Controls:', width / 2, height / 2);
@@ -726,12 +681,9 @@ function drawWelcomeScene() {
     gameState.lastTime = millis();
     gameState.difficulty = 1; 
 
-
-    // Reset platforms
     platforms = [];
     lastPlatformX = width;
 
-    // Create initial platforms
     for (let i = 0; i < 3; i++) {
       let platformWidth = random(100, 200);
       let platformY = random(height * 0.6, height * 0.8);
@@ -763,7 +715,6 @@ function drawGameplayScene() {
     isMusicInitialized = true;
   }
 
-  // Update timer and difficulty
   let currentTime = millis();
   if (currentTime - gameState.lastTime >= 1000) {
     gameState.timeElapsed++;
@@ -774,7 +725,7 @@ function drawGameplayScene() {
       gameState.score += 50;
     }
 
-    // Increase difficulty every 8 seconds
+    // Increase difficulty every 10 seconds
     if (gameState.timeElapsed % 10 === 0) {
       gameState.difficulty += 0.2;
       gameState.gameSpeed = 1 + (gameState.difficulty * 0.3);
@@ -783,13 +734,12 @@ function drawGameplayScene() {
     }
   }
 
-  // Draw game info
   textSize(24);
   textAlign(LEFT);
   fill(255);
   text('Score: ' + gameState.score, 20, 30);
   text('Lives: ' + gameState.lives, 20, 60);
-  text('Time: ' + gameState.timeElapsed, 20, 90);  // Changed from timeLeft to timeElapsed
+  text('Time: ' + gameState.timeElapsed, 20, 90); 
 
   // Update and display platforms
   for (let i = platforms.length - 1; i >= 0; i--) {
@@ -801,7 +751,7 @@ function drawGameplayScene() {
     }
   }
 
-  // Spawn new platforms more frequently
+  // Spawn new platforms
   if (platforms.length === 0 || platforms[platforms.length - 1].x < width - maxPlatformGap) {
     let gap = random(minPlatformGap, maxPlatformGap);
     let platformWidth = random(100, 200);
@@ -843,12 +793,10 @@ function drawGameplayScene() {
 
       // Find a platform that doesn't have the player, has less than 2 coins, hasn't had both coins collected, and is off-screen
       let validPlatforms = platforms.filter(platform => {
-        // Check if player is on this platform
         let playerOnPlatform = player.x > platform.x &&
           player.x < platform.x + platform.width &&
           abs(player.y - platform.y) < 20;
 
-        // Count coins on this platform
         let coinsOnPlatform = 0;
         for (let existingCoin of coins) {
           if (existingCoin.x > platform.x &&
@@ -892,11 +840,9 @@ function drawGameplayScene() {
               }
             }
           }
-
           attempts++;
         }
 
-        // Only add the coin if we found a valid position
         if (validPosition) {
           coins.push(newCoin);
         }
@@ -914,16 +860,12 @@ function drawGameplayScene() {
     }
   }
 
-  // Ensure we always have exactly 2 coins in the game
   while (coins.length < 2) {
-    // Find a platform that doesn't have the player, has less than 2 coins, hasn't had both coins collected, and is off-screen
     let validPlatforms = platforms.filter(platform => {
-      // Check if player is on this platform
       let playerOnPlatform = player.x > platform.x &&
         player.x < platform.x + platform.width &&
         abs(player.y - platform.y) < 20;
 
-      // Count coins on this platform
       let coinsOnPlatform = 0;
       for (let existingCoin of coins) {
         if (existingCoin.x > platform.x &&
@@ -933,7 +875,6 @@ function drawGameplayScene() {
         }
       }
 
-      // Check if platform is off-screen
       let platformIsOffScreen = platform.x > width;
 
       return !playerOnPlatform && coinsOnPlatform < 2 && platform.coinsCollected < 2 && platformIsOffScreen;
@@ -970,7 +911,6 @@ function drawGameplayScene() {
         attempts++;
       }
 
-      // Only add the coin if we found a valid position
       if (validPosition) {
         coins.push(newCoin);
       }
@@ -1001,7 +941,7 @@ function drawGameplayScene() {
       player.invincibleTimer = 60;
       // Play miss sound when hit
       missSampler.triggerAttack("C4");
-      updateLivesLEDs(true); // Pass true to indicate this is a hit
+      updateLivesLEDs(true);
       if (gameState.lives <= 0) {
         gameState.currentScene = 'gameover';
         break;
@@ -1046,8 +986,7 @@ function keyPressed() {
 }
 
 function getPlatformSpeed() {
-  // More aggressive speed scaling with score
-  const speedMultiplier = min(1 + (gameState.score / 75), 8);  // Changed from 125 to 75 and max from 6 to 8
+  const speedMultiplier = min(1 + (gameState.score / 75), 8); 
   return basePlatformSpeed * speedMultiplier;
 }
 
@@ -1065,18 +1004,15 @@ function initAudio() {
   }
 }
 
+// Function to connect to Arduino
 function connect() {
   port.open('Arduino', 9600);
-  // Send a message to Arduino to start sending joystick data
   port.write('START\n');
 }
 
 // Function to update LED lights based on lives
 function updateLivesLEDs(isHit = false) {
   if (port.opened()) {
-    // Send a byte where:
-    // - bits 0-2 represent LED states (1 = on, 0 = off)
-    // - bit 7 represents hit status (1 = hit, 0 = no hit)
     let ledState = 0;
     for (let i = 0; i < gameState.lives; i++) {
       ledState |= (1 << i);
