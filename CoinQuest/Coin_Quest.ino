@@ -34,7 +34,7 @@ void setup()
 void playHitSound()
 {
     // Play a short beep when player gets hit
-    tone(BUZZER, 1000, 200); // 1000Hz for 200ms
+    tone(BUZZER, 500, 200); // 1000Hz for 200ms
     delay(200);
     noTone(BUZZER);
 }
