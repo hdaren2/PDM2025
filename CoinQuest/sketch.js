@@ -18,7 +18,7 @@ let joystickThreshold = 0.2; // Threshold to prevent drift
 let gameState = {
   score: 0,
   lives: 3,
-  timeLeft: 60,
+  timeElapsed: 0,  // Changed from timeLeft to timeElapsed
   currentScene: 'welcome',
   lastTime: 0,
   gameSpeed: 1,
@@ -504,7 +504,7 @@ function setup() {
     gameState = {
       score: 0,
       lives: 3,
-      timeLeft: 60,
+      timeElapsed: 0,  // Changed from timeLeft to timeElapsed
       currentScene: 'welcome',
       lastTime: millis(),
       gameSpeed: 1,
@@ -668,7 +668,7 @@ function drawWelcomeScene() {
     // Reset game state
     gameState.score = 0;
     gameState.lives = 3;
-    gameState.timeLeft = 60;
+    gameState.timeElapsed = 0;  // Changed from timeLeft to timeElapsed
     gameState.gameSpeed = 1;
     gameState.lastTime = millis();
 
@@ -711,8 +711,13 @@ function drawGameplayScene() {
   // Update timer and difficulty
   let currentTime = millis();
   if (currentTime - gameState.lastTime >= 1000) {
-    gameState.timeLeft--;
+    gameState.timeElapsed++;  // Increment time instead of decrementing
     gameState.lastTime = currentTime;
+
+    // Add points every 10 seconds
+    if (gameState.timeElapsed % 10 === 0) {
+      gameState.score += 50;
+    }
 
     // Increase difficulty every 8 seconds
     if (gameState.timeLeft % 8 === 0) {
@@ -722,7 +727,6 @@ function drawGameplayScene() {
 
       // Update music tempo based on game speed
       if (isMusicInitialized) {
-        // Base tempo is 100 BPM, scale up to 400 BPM max (increased from 300)
         Tone.Transport.bpm.value = min(100 * gameState.gameSpeed, 400);
       }
     }
@@ -734,7 +738,7 @@ function drawGameplayScene() {
   fill(255);
   text('Score: ' + gameState.score, 20, 30);
   text('Lives: ' + gameState.lives, 20, 60);
-  text('Time: ' + gameState.timeLeft, 20, 90);
+  text('Time: ' + gameState.timeElapsed, 20, 90);  // Changed from timeLeft to timeElapsed
 
   // Update and display platforms
   for (let i = platforms.length - 1; i >= 0; i--) {
@@ -954,11 +958,6 @@ function drawGameplayScene() {
     }
   }
 
-  // Check game over conditions
-  if (gameState.timeLeft <= 0) {
-    gameState.currentScene = 'gameover';
-  }
-
   // Update high score before transitioning to game over
   if (gameState.score > highScore) {
     highScore = gameState.score;
@@ -974,7 +973,8 @@ function drawGameOverScene() {
   textSize(24);
   text('Final Score: ' + gameState.score, width / 2, height / 2);
   text('High Score: ' + highScore, width / 2, height / 2 + 40);
-  text('Click to Play Again', width / 2, height / 2 + 100);
+  text('Time Survived: ' + gameState.timeElapsed + ' seconds', width / 2, height / 2 + 80);
+  text('Click to Play Again', width / 2, height / 2 + 120);
 
   if (isMusicInitialized) {
     Tone.Transport.stop();
