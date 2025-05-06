@@ -4,6 +4,11 @@ const int LED2 = 4;
 const int LED3 = 5;
 const int BUZZER = 6; // Buzzer connected to pin 5
 
+// Joystick pins
+const int X_PIN = A0;
+const int Y_PIN = A1;
+const int SW_PIN = 2; // SW button pin
+
 void setup()
 {
     // Initialize serial communication
@@ -19,6 +24,11 @@ void setup()
     digitalWrite(LED1, HIGH);
     digitalWrite(LED2, HIGH);
     digitalWrite(LED3, HIGH);
+
+    // Initialize joystick pins
+    pinMode(X_PIN, INPUT);
+    pinMode(Y_PIN, INPUT);
+    pinMode(SW_PIN, INPUT_PULLUP); // Enable internal pull-up resistor for SW button
 }
 
 void playHitSound()
@@ -47,4 +57,22 @@ void loop()
         digitalWrite(LED2, (data & 0x02) ? HIGH : LOW);
         digitalWrite(LED3, (data & 0x04) ? HIGH : LOW);
     }
+
+    // Read joystick values
+    int xValue = analogRead(X_PIN);
+    int yValue = analogRead(Y_PIN);
+    int swValue = digitalRead(SW_PIN); // Read SW button state
+
+    // Convert to -1 to 1 range
+    float xNormalized = map(xValue, 0, 1023, -1, 1);
+    float yNormalized = map(yValue, 0, 1023, -1, 1);
+
+    // Send data in format "X,Y,SW\n"
+    Serial.print(xNormalized);
+    Serial.print(",");
+    Serial.print(yNormalized);
+    Serial.print(",");
+    Serial.println(swValue);
+
+    delay(10); // Small delay to prevent overwhelming the serial port
 }

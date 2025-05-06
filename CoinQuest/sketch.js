@@ -9,6 +9,10 @@ let missSampler;
 let jumpSynth;
 let highScore = 0;
 let port; // Serial port for Arduino communication
+let joystickX = 0;
+let joystickY = 0;
+let joystickSW = 0;  // SW button state
+let joystickThreshold = 0.2; // Threshold to prevent drift
 
 // Game state
 let gameState = {
@@ -142,20 +146,22 @@ class Player extends Character {
     // Reset movement state
     this.isMoving = false;
 
-    // Handle horizontal movement with keyboard
-    if (keyIsDown(LEFT_ARROW) && this.x - this.speed > this.size / 2) {
-      this.x -= this.speed;
-      this.facingRight = false;
-      this.isMoving = true;
-      this.currentAnimation = "left";
-      this.animations[this.currentAnimation].flipped = true;
-    }
-    if (keyIsDown(RIGHT_ARROW) && this.x + this.speed < width - this.size / 2) {
-      this.x += this.speed;
-      this.facingRight = true;
-      this.isMoving = true;
-      this.currentAnimation = "right";
-      this.animations[this.currentAnimation].flipped = false;
+    // Handle horizontal movement with joystick
+    if (abs(joystickX) > joystickThreshold) {
+      if (joystickX < -joystickThreshold && this.x - this.speed > this.size / 2) {
+        this.x -= this.speed;
+        this.facingRight = false;
+        this.isMoving = true;
+        this.currentAnimation = "left";
+        this.animations[this.currentAnimation].flipped = true;
+      }
+      if (joystickX > joystickThreshold && this.x + this.speed < width - this.size / 2) {
+        this.x += this.speed;
+        this.facingRight = true;
+        this.isMoving = true;
+        this.currentAnimation = "right";
+        this.animations[this.currentAnimation].flipped = false;
+      }
     }
 
     // Update animation based on movement and facing direction
@@ -164,8 +170,8 @@ class Player extends Character {
       this.animations[this.currentAnimation].flipped = !this.facingRight;
     }
 
-    // Handle jumping with spacebar
-    if (keyIsDown(32) && !this.isJumping && this.onPlatform) { // 32 is spacebar
+    // Handle jumping with SW button
+    if (joystickSW === 0 && !this.isJumping && this.onPlatform) { // SW button is active low
       this.jumpStartTime = millis();
       this.isJumping = true;
       this.onPlatform = false;
@@ -176,8 +182,8 @@ class Player extends Character {
       jumpSynth.triggerAttackRelease("G5", "16n");
     }
 
-    // Apply variable jump height while spacebar is held
-    if (this.isJumping && keyIsDown(32)) {
+    // Apply variable jump height while SW button is held
+    if (this.isJumping && joystickSW === 0) {
       let holdDuration = millis() - this.jumpStartTime;
       if (holdDuration < this.maxJumpDuration) {
         let jumpMultiplier = this.minJumpMultiplier + ((1 - this.minJumpMultiplier) * (holdDuration / this.maxJumpDuration));
@@ -569,6 +575,23 @@ function createBackground() {
 // GAME LOOP AND SCENE MANAGEMENT
 // =============================================
 function draw() {
+  // Read joystick data from Arduino
+  if (port.available() > 0) {
+    let data = port.readUntil('\n');
+    if (data) {
+      try {
+        let values = data.split(',');
+        if (values.length >= 3) {
+          joystickX = parseFloat(values[0]);
+          joystickY = parseFloat(values[1]);
+          joystickSW = parseInt(values[2]);
+        }
+      } catch (e) {
+        console.error("Error parsing joystick data:", e);
+      }
+    }
+  }
+
   // Draw background
   background(0, 0, 50);
 
@@ -630,8 +653,8 @@ function drawWelcomeScene() {
   textSize(24);
   fill(255);
   text('Controls:', width / 2, height / 2);
-  text('Arrow Keys: Move', width / 2, height / 2 + 40);
-  text('Space: Jump', width / 2, height / 2 + 80);
+  text('Joystick: Move', width / 2, height / 2 + 40);
+  text('Button: Jump', width / 2, height / 2 + 80);
 
   // Add blinking effect to "Press ENTER to Start"
   let blink = sin(frameCount * 0.05) > 0;
@@ -992,6 +1015,8 @@ function initAudio() {
 
 function connect() {
   port.open('Arduino', 9600);
+  // Send a message to Arduino to start sending joystick data
+  port.write('START\n');
 }
 
 // Function to update LED lights based on lives
