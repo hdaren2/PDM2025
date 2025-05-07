@@ -1,0 +1,52 @@
+Name: Hunter D’Arensbourg
+Project Title: Coin Quest
+ 
+Description:
+"Coin Quest" is a fast-paced arcade-style game where the player controls a character navigating through a scrolling environment filled with coins to collect and enemies to outmaneuver. The objective is to collect as many coins as possible while surviving as long as possible.
+The player starts with 3 lives. Touching an enemy results in the loss of one life. The game ends when all lives are lost. As the game progresses, the speed increases and enemies/obstacles appear more frequently, making survival and coin collection increasingly challenging.
+ 
+PROJECT ELEMENTS
+ 
+GRAPHICS
+•	Sprites for:
+  o	Player character 
+  o	Coins 
+  o	Enemies 
+•	Background: Scrolling terrain 
+•	UI Text:
+  o	Display current score 
+  o	Display timer
+  o	Display lives remaining
+ 
+SOUND
+•	Synth SFXs for:
+  o	Collision with obstacles/enemies
+  o	Jump or movement action
+•	Background music:
+  o	Adventurous-style track
+  o	Tempo increases as speed increases
+ 
+HARDWARE INPUT
+•	Joystick:
+  o	Control movement (horizontal)
+•	Button:
+  o	Jump 
+ 
+HARDWARE OUTPUT
+•	3 LEDs to represent player lives:
+  o	Each LED = 1 life
+  o	LED turns off when a life is lost
+  o	All LEDs off = game over
+ 
+GAMEPLAY MECHANICS
+•	Coin Collection:
+  o	+10 points per coin
+  o	Coins appear on platforms that player can jump to
+•	Enemies:
+  o	Falling from top of screen
+  o	Cannot be defeated, only avoided
+  o	1 hit = lose 1 life
+•	Difficulty Progression:
+  o	Speed increases over time
+  o	More frequent obstacles/enemies appear as score increases
+ 
