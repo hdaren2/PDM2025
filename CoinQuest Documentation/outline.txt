@@ -1,6 +1,3 @@
-Name: Hunter D’Arensbourg
-Project Title: Coin Quest
- 
 Description:
 "Coin Quest" is a fast-paced arcade-style game where the player controls a character navigating through a scrolling environment filled with coins to collect and enemies to outmaneuver. The objective is to collect as many coins as possible while surviving as long as possible.
 The player starts with 3 lives. Touching an enemy results in the loss of one life. The game ends when all lives are lost. As the game progresses, the speed increases and enemies/obstacles appear more frequently, making survival and coin collection increasingly challenging.
